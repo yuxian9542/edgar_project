@@ -3,22 +3,50 @@ from sec_edgar_downloader import Downloader
 import yfinance as yf
 import datetime
 import os
+import requests
+import json
+
+
+def is_us_company(ticker):
+    # SEC has "entity-info" endpoint to get registrant type
+    headers = {"User-Agent": "zyuxian9542@gmail.com"}
+    url = f"https://data.sec.gov/submissions/CIK{get_cik(ticker):010d}.json"
+    res = requests.get(url, headers=headers)
+    data = res.json()
+    forms = data.get("filings", {}).get("recent", {}).get("form", [])
+    
+    return "10-K" in forms  # crude but generally effective
+
+
+def get_cik(ticker):
+    url = "https://www.sec.gov/files/company_tickers.json"
+    headers = {"User-Agent": "Your Name your.email@example.com"}
+    r = requests.get(url, headers=headers)
+    data = r.json()
+    for info in data.values():
+        if info["ticker"].lower() == ticker.lower():
+            return int(info["cik_str"])
+    raise ValueError(f"Ticker {ticker} not found.")
 
 
 def download_filings_helper_(ticker, year):
     """
     Download SEC filings for specified companies and years.
+    If the company is a US company, it downloads 10-K filings,
+    otherwise it downloads 20-F filings.
     
     :param companies: Dictionary of company ticker symbols and their respective years.
     :param years: List of years to download filings for.
     """
     dl = Downloader(MY_COMPANY, EMAIL, SAVING_PATH)
+    is_us = is_us_company(ticker)
+    file_name = '10-K' if is_us else '20-F'
 
     try:
-        dl.get("10-K", ticker, after=f'{year}-01-01')
-        print(f"Downloaded 10-K for {ticker} for the year {year}.")
+        dl.get(file_name, ticker, after=f'{year}-01-01')
+        print(f"Downloaded {file_name} for {ticker} for the year {year}.")
     except Exception as e:
-        print(f"Failed to download 10-K for {ticker} for the year {year}: {e}")
+        print(f"Failed to download {file_name} for {ticker} for the year {year}: {e}")
 
 
 def download_filings(companies=COMPANIES):
