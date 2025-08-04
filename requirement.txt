@@ -1,0 +1,8 @@
+certifi==2025.8.3
+charset-normalizer==3.4.2
+click==8.2.1
+idna==3.10
+pyrate-limiter==3.9.0
+requests==2.32.4
+sec-edgar-downloader==5.0.3
+urllib3==2.5.0
