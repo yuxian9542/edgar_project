@@ -1,6 +1,6 @@
 import click
 import config
-from collect_data import download_filings, download_filings_helper_
+from collect_data import download_filings, download_filings_helper_, download_stock_data
 
 
 @click.command()
@@ -19,8 +19,10 @@ def main(download, company, year):
     if download:
         if company and year:
             download_filings_helper_(company, year)
+            download_stock_data(company, f'{year}-01-01', f'{year}-12-31')
         else:
             download_filings(config.COMPANIES)
+            download_stock_data(config.COMPANIES)
 
 
 if __name__ == '__main__':
