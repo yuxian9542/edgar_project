@@ -1,13 +1,14 @@
 import pandas as pd
 import json
 from pathlib import Path
+from config import SAVING_PATH
 
 
 def load_filing_data():
     """Load and process SEC filing data."""
-    # Load the JSON files
-    dates_file = Path('data/filing_dates.json')
-    mentions_file = Path('data/company_mentions.json')
+    # Load the JSON files using absolute paths from SAVING_PATH
+    dates_file = Path(SAVING_PATH) / 'filing_dates.json'
+    mentions_file = Path(SAVING_PATH) / 'company_mentions.json'
     
     # Check if files exist
     if dates_file.exists():
@@ -75,7 +76,7 @@ def create_mentions_df(mentions_data, dates_data):
                         'ticker': filing_ticker,
                         'year': int(year),
                         'mentioned_company': mentioned_ticker,
-                        'time': count  # time = number of times mentioned
+                        'num_mention': count  # time = number of times mentioned
                     }
                     rows.append(row)
     
@@ -84,10 +85,55 @@ def create_mentions_df(mentions_data, dates_data):
     return df
 
 
-# Load data
-dates_data, mentions_data = load_filing_data()
+def process_and_save_data():
+    """Process SEC filing data, merge dataframes, and save to SAVING_PATH."""
+    print("Starting data processing...")
+    
+    # Load data
+    dates_data, mentions_data = load_filing_data()
+    
+    # Create DataFrames
+    print("Creating DataFrames...")
+    df_filings = create_filing_summary_df(dates_data)
+    df_mentions = create_mentions_df(mentions_data, dates_data)
+    
+    print(f"Created df_filings: {df_filings.shape}")
+    print(f"Created df_mentions: {df_mentions.shape}")
+    
+    # Merge dataframes
+    print("Merging DataFrames...")
+    df_filing_mentions = pd.merge(df_filings, df_mentions, on=['ticker', 'year'], how='right')
+    print(f"Created df_filing_mentions: {df_filing_mentions.shape}")
+    
+    # Create aggregated mentions dataframe
+    print("Creating aggregated mentions DataFrame...")
+    df_mentions_agg = df_filing_mentions.groupby(['mentioned_company', 'filed_date', 'year']).agg(
+        num_mention=('num_mention', 'sum')).reset_index()
+    print(f"Created df_mentions_agg: {df_mentions_agg.shape}")
+    
+    # Save DataFrames to CSV files
+    save_path = Path(SAVING_PATH)
+    save_path.mkdir(exist_ok=True)
+    
+    filing_mentions_file = save_path / "df_filing_mentions.csv"
+    mentions_agg_file = save_path / "df_mentions_agg.csv"
+    
+    print(f"Saving DataFrames to {save_path}...")
+    df_filing_mentions.to_csv(filing_mentions_file, index=False)
+    df_mentions_agg.to_csv(mentions_agg_file, index=False)
+    
+    print(f"✓ Saved df_filing_mentions to: {filing_mentions_file}")
+    print(f"✓ Saved df_mentions_agg to: {mentions_agg_file}")
+    
+    # Display sample data
+    print("\nSample of df_filing_mentions:")
+    print(df_filing_mentions.head())
+    
+    print("\nSample of df_mentions_agg:")
+    print(df_mentions_agg.head())
+    
+    return df_filing_mentions, df_mentions_agg
 
-# Create DataFrames
-df_filings = create_filing_summary_df(dates_data)
-df_mentions = create_mentions_df(mentions_data, dates_data)
 
+if __name__ == "__main__":
+    df_filing_mentions, df_mentions_agg = process_and_save_data()
