@@ -38,54 +38,48 @@ def create_filing_summary_df(dates_data):
             row = {
                 'ticker': ticker,
                 'year': int(year),
-                'accession_number': filing_info.get('accession_number'),
-                'filing_type': filing_info.get('filing_type'),
-                'filed_date': filing_info.get('dates', {}).get('filed_date'),
-                'period_end': filing_info.get('dates', {}).get('period_end'),
-                'acceptance_datetime': filing_info.get('dates', {}).get('acceptance_datetime'),
-                'company_name': filing_info.get('company_info', {}).get('company_name'),
-                'cik': filing_info.get('company_info', {}).get('cik'),
-                'state_incorporation': filing_info.get('company_info', {}).get('state_incorporation')
+                'filed_date': filing_info.get('dates', {}).get('filed_date')
             }
             rows.append(row)
     
     df = pd.DataFrame(rows)
     
-    # Convert date columns
+    # Convert date column
     if not df.empty:
         df['filed_date'] = pd.to_datetime(df['filed_date'])
-        df['period_end'] = pd.to_datetime(df['period_end'])
-        df['acceptance_datetime'] = pd.to_datetime(df['acceptance_datetime'])
     
     return df
 
 
-def create_mentions_df(mentions_data):
-    """Create a DataFrame of competitor mentions."""
+def create_mentions_df(mentions_data, dates_data):
+    """Create a DataFrame of competitor mentions with mention counts."""
     rows = []
     
     for filing_ticker, years_data in mentions_data.items():
-        for year, filing_info in years_data.items():
-            mentions = filing_info.get('competitor_mentions', {})
+        for year, mentions in years_data.items():
+            # Handle both data structures:
+            # 1. New structure: mentions_data[ticker][year] = {'competitor_mentions': {...}, 'dates': {...}}
+            # 2. Old structure: mentions_data[ticker][year] = {mentioned_ticker: count, ...}
             
-            for mentioned_ticker, count in mentions.items():
-                row = {
-                    'filing_ticker': filing_ticker,
-                    'year': int(year),
-                    'mentioned_ticker': mentioned_ticker,
-                    'mention_count': count,
-                    'filed_date': filing_info.get('dates', {}).get('filed_date'),
-                    'period_end': filing_info.get('dates', {}).get('period_end'),
-                    'accession_number': filing_info.get('accession_number')
-                }
-                rows.append(row)
+            if isinstance(mentions, dict) and 'competitor_mentions' in mentions:
+                # New structure with full filing info
+                competitor_mentions = mentions.get('competitor_mentions', {})
+            else:
+                # Old structure - mentions is directly the company counts
+                competitor_mentions = mentions
+            
+            # Create rows for each mentioned company (excluding zero counts)
+            for mentioned_ticker, count in competitor_mentions.items():
+                if count > 0:  # Only include non-zero mentions
+                    row = {
+                        'ticker': filing_ticker,
+                        'year': int(year),
+                        'mentioned_company': mentioned_ticker,
+                        'time': count  # time = number of times mentioned
+                    }
+                    rows.append(row)
     
     df = pd.DataFrame(rows)
-    
-    # Convert date columns
-    if not df.empty:
-        df['filed_date'] = pd.to_datetime(df['filed_date'])
-        df['period_end'] = pd.to_datetime(df['period_end'])
     
     return df
 
@@ -95,12 +89,5 @@ dates_data, mentions_data = load_filing_data()
 
 # Create DataFrames
 df_filings = create_filing_summary_df(dates_data)
-df_mentions = create_mentions_df(mentions_data)
+df_mentions = create_mentions_df(mentions_data, dates_data)
 
-print(f"\nFiling Summary DataFrame: {df_filings.shape}")
-if not df_filings.empty:
-    print(df_filings.head())
-
-print(f"\nMentions DataFrame: {df_mentions.shape}")
-if not df_mentions.empty:
-    print(df_mentions.head())
